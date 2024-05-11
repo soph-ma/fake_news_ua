@@ -6,11 +6,9 @@ def escape_markdown_links(text) -> str:
     replacements = {'[': '', ']': '', "(": " ", ")": ""}
     if len(matches):
         for match in matches:
-            # print(match)
             trans_table = str.maketrans(replacements)
             cleaned_match = match.translate(trans_table)
             text = text.replace(match, cleaned_match)
-        # print("CLEANED TEXT", text)
         return text
     return text
 
@@ -44,9 +42,7 @@ def remove_empty_lines(text) -> str:
     except: return str(text)
 
 def remove_links(text):
-    # This regular expression matches most URLs
     pattern = r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
-    # Replace found URLs with an empty string
     try:
         clean_text = re.sub(pattern, '', text)
     except: clean_text=text

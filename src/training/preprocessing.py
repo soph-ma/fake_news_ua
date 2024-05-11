@@ -1,45 +1,20 @@
 import pandas as pd
-import nltk
 import torch
 import ast
 import string
 import pymorphy2
 from collections import Counter
-from transformers import BertTokenizer
 from nltk import sent_tokenize
 
 # setup
 csvfile = "translated.csv"
 
 morph = pymorphy2.MorphAnalyzer(lang='uk')
-with open(r'stopwords_ua_list.txt', "r", encoding="utf-8") as f: 
+with open(r'src/misc/stopwords_ua_list.txt', "r", encoding="utf-8") as f: 
     stopwords = ast.literal_eval(f.read())
-with open("markers.txt", "r", encoding="utf-8") as f:
+with open("src/misc/markers.txt", "r", encoding="utf-8") as f:
     markers = [w.replace("\n", "") for w in f.readlines()[:100]]
 
-
-# functions
-# def merge_dfs(fake_news_files: list[str], real_news_files: list[str]) -> pd.DataFrame:
-#     merged_df = pd.DataFrame(columns=['text', 'label']) 
-#     for f in fake_news_files: 
-#         df = pd.read_csv(f, encoding="utf-8")
-#         for index, row in df.iterrows():
-#             text = row["text"]
-#             label = "fake"
-#             merged_df.loc[len(merged_df)] =  {
-#                 'text': text,
-#                 'label': label 
-#             } 
-#     for f in real_news_files: 
-#         df = pd.read_csv(f, encoding="utf-8")
-#         for index, row in df.iterrows():
-#             text = row["text"]
-#             label = "real"
-#             merged_df.loc[len(merged_df)] =  {
-#                 'text': text,
-#                 'label': label 
-#             } 
-#     return balance_data(merged_df)
 
 def cat_titles_and_texts(titles: list[str], texts: list[str]) -> list[str]:
     output = []
@@ -128,33 +103,6 @@ def tokenize_titles(titles: list[str], dictionary: dict) -> list[list[float]]:
 def lemmatize_word(word):
     return morph.parse(word)[0].normal_form
 
-def bert_tokenize(x: list[str], tokenizer) -> (torch.Tensor, torch.Tensor): 
-    if torch.cuda.is_available():
-        device = torch.device("cuda")
-    else:
-        device = torch.device("cpu")
-        
-    tokenized_x = []
-    attention_masks = []
-    for text in x:
-        encoded_dict = tokenizer.encode_plus(
-            text,                      # Sentence to encode.
-            add_special_tokens = True, # Add '[CLS]' and '[SEP]'
-            max_length = 150,          # Pad & truncate all sentences.
-            truncation = True,
-            padding = 'max_length',    # Pad with zeroes till max length.
-            return_attention_mask = True,   # Construct attn. masks.
-            return_tensors = 'pt',     # Return pytorch tensors.
-        )
-        
-        tokenized_x.append(encoded_dict['input_ids'].to(device))
-        attention_masks.append(encoded_dict['attention_mask'].to(device))
-        
-    # Flatten the lists
-    tokenized_x = torch.cat(tokenized_x, dim=0)
-    attention_masks = torch.cat(attention_masks, dim=0)
-    
-    return tokenized_x, attention_masks
 
 def bert_tokenize_without_masks(x: list[str], tokenizer) -> (torch.Tensor): 
     if torch.cuda.is_available():
@@ -165,52 +113,21 @@ def bert_tokenize_without_masks(x: list[str], tokenizer) -> (torch.Tensor):
     tokenized_x = []
     for text in x:
         encoded_dict = tokenizer.encode_plus(
-            text,                      # Sentence to encode.
-            add_special_tokens = True, # Add '[CLS]' and '[SEP]'
-            max_length = 150,          # Pad & truncate all sentences.
+            text,                      
+            add_special_tokens = True, 
+            max_length = 150,          
             truncation = True,
-            padding = 'max_length',    # Pad with zeroes till max length.
-            return_tensors = 'pt',     # Return pytorch tensors.
+            padding = 'max_length',    
+            return_tensors = 'pt',     
         )
         
         tokenized_x.append(encoded_dict['input_ids'].to(device))
         
-    # Flatten the lists
+    # flatten the lists
     tokenized_x = torch.cat(tokenized_x, dim=0)
     
     return tokenized_x
 
-def mt5_tokenize_without_masks(x: list[str], tokenizer) -> torch.Tensor:
-    if torch.cuda.is_available():
-        device = torch.device("cuda")
-    else:
-        device = torch.device("cpu")
-    
-    tokenized_x = []
-    for text in x:
-        encoded_dict = tokenizer.encode_plus(
-            text,                          # Sentence to encode.
-            add_special_tokens=True,       # Add special tokens like '<s>' and '</s>' for T5
-            max_length=150,                # Pad & truncate all sentences.
-            truncation=True,
-            padding='max_length',          # Pad to the maximum length specified.
-            return_tensors='pt',           # Return PyTorch tensors.
-        )
-        
-        tokenized_x.append(encoded_dict['input_ids'].to(device))
-    
-    # Flatten the list of tensors into a single tensor
-    tokenized_x = torch.cat(tokenized_x, dim=0)
-    
-    return tokenized_x
-
-# def get_vocab_size(df: pd.DataFrame): 
-#     all_texts = ""
-#     for i, r in df.iterrows(): 
-#         text = r["ukr_text"]
-#         all_texts += text
-#     vocab_size = len(set(all_texts.lower().split()))
-#     return vocab_size
 
 def get_vocab_size(texts: list[str]): 
     all_texts = ""
@@ -226,14 +143,6 @@ def preprocess_text(text: str, padding=150) -> list[str]:
     # lemmatization and removing stop words
     text = str(text)
     words = [lemmatize_word(word) for word in text.split() if word.lower() not in stopwords]
-    # words = [lemmatize_word(word) for word in text.split()]
-    padded = words[:padding] + [0] * (padding - len(words))
-    return padded
-
-def preprocess_titles(title: str, padding=10) -> list[str]: 
-    # lemmatization and removing stop words
-    title = str(title)
-    words = [lemmatize_word(word) for word in title.split() if word.lower() not in stopwords]
     padded = words[:padding] + [0] * (padding - len(words))
     return padded
 
@@ -273,6 +182,3 @@ def get_average_length(x: list[str]):
     print(most_common_lengths)
     return sum(lengths) / len(lengths)
     
-# df = merge_dfs(real_news_files=csvfiles_real, fake_news_files=csvfiles_fake)
-# df.to_csv("data/data.csv")
-# print(markers)
